@@ -39,9 +39,13 @@ The various software packages installed at the computing cluster are made availa
 
 The list of NCBI genomes to be included in the analysis was downloaded on March 2018 and is available in the file `data/assembly_summary.txt`. 
 
-### Gtdb-tk installation
+### Äspö MAGs not in NCBI
 
 ...
+
+### Gtdb-tk installation
+
+Use **gtdb-tk**. Install it as conda environment, as described here https://bitbucket.org/scilifelab-lts/m_dopson_1701/wiki/Installation.
 
 ## Main analysis
 
@@ -208,7 +212,7 @@ EOF
 done
 ```
 
-#### MAGs
+#### Äspö MAGs
 
 ```bash
 ls /crex2/proj/sllstore2017037/nobackup/shared_data/aspo/metagenomes/scilife_metagenomes/data_papers_planktonic_biofilm/bins50/genomes/*/*/*.fa > data/MAG_list
@@ -245,7 +249,11 @@ done
 EOF
 ```
 
-### Taxonomic assignment of MAGs from Wu et al.
+### Taxonomic assignment of NCBI genomes and Äspö MAGs
+
+For most NCBI genomes used in this analysis taxonomic assignments already available through GTDB. For the ones with no taxonomic assignment available, we'll compute it ourselves with gtdb-tk. We need also to assign taxonomy to the Äspö MAGs.
+
+#### Taxonomic assignment of MAGs from Wu et al.
 
 ### Concatenate outputs and join with taxonomic assignments
 
