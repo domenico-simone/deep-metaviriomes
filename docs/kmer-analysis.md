@@ -27,6 +27,14 @@ We also need to copy **our MAGs**, but we need first to exclude contigs which ha
 
 ## Set up working environment
 
+This analysis has been run on a computing cluster with a SLURM job scheduler. Access to resources managed by SLURM usually requires an active account where computing time is charged. In order to replicate the analyses described in this repo, you need to set the following variable which identifies the account on the cluster.
+
+```bash
+export SLURMaccount="snic2018-3-187"
+```
+
+The various software packages installed at the computing cluster are made available to the clusters through **LMOD**, a system of modules. If you don't need to use this system
+
 ### NCBI genomes to be included in the analysis
 
 The list of NCBI genomes to be included in the analysis was downloaded on March 2018 and is available in the file `data/assembly_summary.txt`. 
@@ -39,12 +47,12 @@ The list of NCBI genomes to be included in the analysis was downloaded on March 
 
 ### Calculate k-mer frequencies (jellyfish)
 
-#### Generate chunks of 5000 genomes
+#### NCBI bacterial/archaeal genomes
 
-**Try with sets of 5000 genomes.**
+Generate chunks of 5000 genomes (`intermediate/jellyfish/NCBI_5000/assembly_summary.links.*`) and save a list of them in the file `intermediate/jellyfish/NCBI_5000/assembly_summary.all.links`.
 
 ```bash
-cd /crex2/proj/sllstore2017037/nobackup/domenico/new_analyses/aspo_viral
+#cd /crex2/proj/sllstore2017037/nobackup/domenico/new_analyses/aspo_viral
 
 mkdir -p intermediate/jellyfish/NCBI_5000
 
@@ -79,7 +87,7 @@ intermediate/jellyfish/NCBI_5000/assembly_summary.links* > \
 intermediate/jellyfish/NCBI_5000/assembly_summary.all.links
 ```
 
-Run Jellyfish on batches of NCBI genome sequences.
+Run Jellyfish on batches of NCBI bacterial/archaeal genome sequences
 
 ```bash
 export wdir=`pwd`
@@ -88,19 +96,15 @@ export outDir=intermediate/jellyfish/NCBI_5000
 cd ${wdir}
 mkdir -p ${outDir}
 
-sbatch -p core -A snic2018-3-187 -t 50:00:00 \
+sbatch -p core -A ${SLURMaccount} -t 50:00:00 \
 -J jellyfish_NCBI_%a \
 -o intermediate/jellyfish/NCBI_5000/jellyfish_NCBI_%a.out \
 -e intermediate/jellyfish/NCBI_5000/jellyfish_NCBI_%a.err \
---array=1-$(wc -l < intermediate/jellyfish/NCBI_5000/assembly_summary.all.links) \
---mail-type=ALL --mail-user=domenico.simone@lnu.se<<'EOF'
+--array=1-$(wc -l < intermediate/jellyfish/NCBI_5000/assembly_summary.all.links)<<'EOF'
 #!/bin/bash
 
 module load bioinfo-tools
 module load jellyfish
-
-#outDir=intermediate/jellyfish/NCBI_5000
-#mkdir -p ${outDir}
 
 genomeList=$(sed -n "$SLURM_ARRAY_TASK_ID"p ${outDir}/assembly_summary.all.links)
 
@@ -138,7 +142,7 @@ while md5check_exp != md5check_fetched:
 print 'Download succeeded!'
 " $line
     justID=$(echo $line | awk 'BEGIN{FS="/"}{print $NF}')
-    for k in 1 2 3 4 5; do
+    for k in 4; do
         outFile=${justID/.fna.gz/.jf${k}}
         outTab=${justID/.fna.gz/.k${k}}
         time zcat ${justID} | jellyfish count \
@@ -158,7 +162,89 @@ EOF
 
 #### Viral contigs
 
+Get separate lists of viral contigs to have 4 separate jobs.
+Create output directory `intermediate/jellyfish/viral`.
+
+```bash
+ls data/genome_viral/P911_10*.fa | awk 'NR<1013' > data/genome_viral/contigList.1
+ls data/genome_viral/P911_10*.fa | awk 'NR>1012&&NR<2026' > data/genome_viral/contigList.2
+ls data/genome_viral/P911_10*.fa | awk 'NR>2025&&NR<3039' > data/genome_viral/contigList.3
+ls data/genome_viral/P911_10*.fa | awk 'NR>3038' > data/genome_viral/contigList.4
+
+mkdir -p intermediate/jellyfish/viral
+```
+
+Run one job for each contigList file
+
+```bash
+for f in $(ls ./data/genome_viral/contigList.*); do
+    export f=$f
+    serial=$(basename $f | awk 'BEGIN{FS="."}{print $NF}')
+    #echo $f, $q
+    sbatch -p core -n 10 -A ${SLURMaccount} -t 4:00:00 \
+    -J jellyFish.${serial} -o logs/jellyFish.${serial}.out -e logs/jellyFish.${serial}.err \
+    --mail-type=ALL --mail-user=domenico.simone@lnu.se<<'EOF'
+#!/bin/bash
+
+module load jellyfish
+outDir=intermediate/jellyfish/viral
+
+for k in 4; do
+    for contigFile in $(cat ${f}); do
+        b=$(basename ${contigFile})
+        outFile=$(echo ${b/.fa/.jf${k}})
+        outTab=$(echo ${b/.fa/.k${k}})
+        jellyfish count \
+        -m${k} \
+        -o ${outDir}/${outFile} \
+        -s 100M \
+        -t 10 \
+        ${contigFile}
+        jellyfish dump -c ${outDir}/${outFile} -o ${outDir}/${outTab}
+    done
+done
+
+EOF
+done
+```
+
 #### MAGs
+
+```bash
+ls /crex2/proj/sllstore2017037/nobackup/shared_data/aspo/metagenomes/scilife_metagenomes/data_papers_planktonic_biofilm/bins50/genomes/*/*/*.fa > data/MAG_list
+
+# create output directory for jellyfish
+mkdir -p intermediate/jellyfish/MAGs
+
+export f=data/MAG_list
+#serial=$(basename $f | awk 'BEGIN{FS="."}{print $NF}')
+#echo $f, $q
+sbatch -p core -n 10 -A ${SLURMaccount} -t 4:00:00 \
+-J jellyFish.MAG -o jellyFish.MAG.out -e jellyFish.MAG.err \
+--mail-type=ALL --mail-user=domenico.simone@lnu.se<<'EOF'
+#!/bin/bash
+
+module load jellyfish
+outDir=intermediate/jellyfish/MAGs
+
+for k in 4; do
+    for contigFile in $(cat ${f}); do
+        b=$(basename ${contigFile})
+        outFile=$(echo ${b/.fa/.jf${k}})
+        outTab=$(echo ${b/.fa/.k${k}})
+        jellyfish count \
+        -m ${k} \
+        -o ${outDir}/${outFile} \
+        -s 100M \
+        -t 10 \
+        ${contigFile}
+        jellyfish dump -c ${outDir}/${outFile} -o ${outDir}/${outTab}
+    done
+done
+
+EOF
+
+
 
 #### NCBI genomes
 
