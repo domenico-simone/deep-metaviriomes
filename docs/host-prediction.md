@@ -1,4 +1,4 @@
-# Kmer analysis viral vs bacterial/archaeal genomes
+# Host prediction for viral contigs
 
 <!-- TOC depthFrom:2 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
@@ -243,10 +243,7 @@ for k in 4; do
 done
 
 EOF
-
-
-
-#### NCBI genomes
+```
 
 ### Taxonomic assignment of MAGs from Wu et al.
 
