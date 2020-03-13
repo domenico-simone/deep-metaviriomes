@@ -218,6 +218,8 @@ done
 
 Create batches of jellyfish results for viral contigs to distribute the computational burden for downstream analyses. 
 
+Run in a python shell:
+
 ```python
 # python
 
@@ -350,6 +352,8 @@ EOF
 
 ## Merge MAE analysis with taxonomic assignments
 
+Run in a python shell:
+
 ```python
 import pandas as pd
 import glob, os
@@ -468,6 +472,8 @@ taxonomic_assignment(4)
 
 Many putative host genomes have no taxonomy. We should get their AC, download them and perform taxonomic assignment.
 
+Run in a python shell:
+
 ```python
 import pandas as pd
 import glob, os, sys
@@ -547,6 +553,8 @@ done
 ```
 
 Re-merge MAE analysis with taxonomic assignments, adding the new ones
+
+Run in a python shell:
 
 ```python
 import pandas as pd
@@ -665,6 +673,8 @@ taxonomic_assignment(4)
 ```
 
 Summarise assignments at the relevant_rank level
+
+Run in a python shell:
 
 ```python
 a = open('results/viral_contigs_host_prediction/MAE/viral_contigs_host_assignment_k4.181114.tsv', 'r')
