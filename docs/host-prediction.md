@@ -1,25 +1,30 @@
 # Host prediction for viral contigs
 
-<!-- TOC depthFrom:2 depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
-
+<!-- TOC START min:2 max:5 link:true asterisk:false update:true -->
 - [Set up working environment](#set-up-working-environment)
-	- [NCBI genomes to be included in the analysis](#ncbi-genomes-to-be-included-in-the-analysis)
-	- [Gtdb-tk installation](#gtdb-tk-installation)
+    - [Gtdb-tk installation](#gtdb-tk-installation)
+- [Data included in this protocol](#data-included-in-this-protocol)
+    - [Viral contigs](#viral-contigs)
+    - [NCBI genomes](#ncbi-genomes)
+    - [Äspö MAGs not in NCBI](#äspö-mags-not-in-ncbi)
 - [Main analysis](#main-analysis)
-	- [Calculate k-mer frequencies (jellyfish)](#calculate-k-mer-frequencies-jellyfish)
-		- [Generate chunks of 5000 genomes](#generate-chunks-of-5000-genomes)
-		- [Viral contigs](#viral-contigs)
-		- [MAGs](#mags)
-		- [NCBI genomes](#ncbi-genomes)
-	- [Taxonomic assignment of MAGs from Wu et al.](#taxonomic-assignment-of-mags-from-wu-et-al)
-	- [Concatenate outputs and join with taxonomic assignments](#concatenate-outputs-and-join-with-taxonomic-assignments)
-	- [Taxonomic assignment with gtdb-tk](#taxonomic-assignment-with-gtdb-tk)
-	- [Calculate Mean Absolute Error (MAE) to get host prediction (bacterial/archaeal vs viral)](#calculate-mean-absolute-error-mae-to-get-host-prediction-bacterialarchaeal-vs-viral)
+    - [Calculate k-mer frequencies (jellyfish)](#calculate-k-mer-frequencies-jellyfish)
+        - [NCBI bacterial/archaeal genomes](#ncbi-bacterialarchaeal-genomes)
+        - [Viral contigs](#viral-contigs-1)
+        - [Äspö MAGs](#äspö-mags)
+    - [what](#what)
+    - [Taxonomic assignment of NCBI genomes and Äspö MAGs](#taxonomic-assignment-of-ncbi-genomes-and-äspö-mags)
+        - [Taxonomic assignment of NCBI genomes missing from GTDB](#taxonomic-assignment-of-ncbi-genomes-missing-from-gtdb)
+        - [Taxonomic assignment of MAGs from Wu et al.](#taxonomic-assignment-of-mags-from-wu-et-al)
+    - [Concatenate outputs and join with taxonomic assignments](#concatenate-outputs-and-join-with-taxonomic-assignments)
+    - [Taxonomic assignment with gtdb-tk](#taxonomic-assignment-with-gtdb-tk)
+    - [Calculate Mean Absolute Error (MAE) to get host prediction (bacterial/archaeal vs viral)](#calculate-mean-absolute-error-mae-to-get-host-prediction-bacterialarchaeal-vs-viral)
 - [Taxonomic assignment of putative host genomes not available in gtdb-tk (gtdb-tk)](#taxonomic-assignment-of-putative-host-genomes-not-available-in-gtdb-tk-gtdb-tk)
-	- [Run batches](#run-batches)
-	- [Summarise assignments at the relevant_rank level](#summarise-assignments-at-the-relevantrank-level)
+    - [Run batches](#run-batches)
+    - [Re-merge MAE results](#re-merge-mae-results)
+    - [Summarise assignments at the relevant_rank level](#summarise-assignments-at-the-relevant_rank-level)
+<!-- TOC END -->
 
-<!-- /TOC -->
 
 We are trying also `jellyfish`.
 
@@ -33,19 +38,23 @@ This analysis has been run on a computing cluster with a SLURM job scheduler. Ac
 export SLURMaccount="snic2018-3-187"
 ```
 
-The various software packages installed at the computing cluster are made available to the clusters through **LMOD**, a system of modules. If you don't need to use this system
+### Gtdb-tk installation
 
-### NCBI genomes to be included in the analysis
+Use **gtdb-tk**. Install it as conda environment, as described here https://bitbucket.org/scilifelab-lts/m_dopson_1701/wiki/Installation.
+
+## Data included in this protocol
+
+### Viral contigs
+
+The dataset included here is available at NCBI with accession numbers:MT141153-MT145203.
+
+### NCBI genomes
 
 The list of NCBI genomes to be included in the analysis was downloaded on March 2018 and is available in the file `data/assembly_summary.txt`. 
 
 ### Äspö MAGs not in NCBI
 
-...
-
-### Gtdb-tk installation
-
-Use **gtdb-tk**. Install it as conda environment, as described here https://bitbucket.org/scilifelab-lts/m_dopson_1701/wiki/Installation.
+Metagenome assembled genomes (hereafter named **MAGs**) binned from ...
 
 ## Main analysis
 
@@ -166,7 +175,7 @@ EOF
 
 #### Viral contigs
 
-Get separate lists of viral contigs to have 4 separate jobs.
+Get separate lists of viral contigs to have 4 separate jobs, in order to distribute the computational burden.
 Create output directory `intermediate/jellyfish/viral`.
 
 ```bash
@@ -249,9 +258,201 @@ done
 EOF
 ```
 
+#### Create list of batches of jellyfish results for viral contigs 
+
+Create list of batches
+
+```python
+# python
+
+import glob, os
+
+A = glob.glob("intermediate/jellyfish/viral/*.k4")
+A = [i.replace(".k1", "") for i in A]
+
+outdir = "intermediate/jellyfish/viral/batches"
+try: os.mkdir(outdir)
+except: pass
+
+c = 1
+t = 1
+for i in A:
+    outhandle = open('%s/viral_batch.%s' % (outdir, str(t).zfill(4)), 'w')
+    if c%5 == 0:
+        t += 1
+        outhandle.close()
+        outhandle = open('%s/viral_batch.%s' % (outdir, str(t).zfill(4)), 'w')
+    outhandle.write(i + '\n')
+    c += 1
+```
+
+```bash
+ls intermediate/jellyfish/viral/batches/viral_batch.* > intermediate/jellyfish/viral/batches/viral_batch_list
+```
+
+
+## Calculate MAE of kmer frequencies to get host prediction
+
+As in doi:10.1038/nature19366.
+
+The script `kmerFreqMAE.py` (in the `scripts` folder) performs calculation of mean absolute error between all viral contig kmer frequency profiles and NCBI/Aspo genome kmer frequency profiles.
+
+Raw results are stored in folder `mkdir -p intermediate/jellyfish/viral_mae_OrderedDict/k4`.
+
+Best results (MAE < 0.001) are stored in folder `mkdir -p intermediate/jellyfish/viral_mae/k4`.
+
+```bash
+# Create output directories
+
+mkdir -p intermediate/jellyfish/viral_mae_OrderedDict/k4
+mkdir -p intermediate/jellyfish/viral_mae/k4
+mkdir -p logs/viral_mae
+
+export k=4
+
+sbatch -n1 -p core -A snic2018-3-187 -t 2-00:00:00 \
+--array=1-$(wc -l < intermediate/jellyfish/viral/batches/viral_batch_list) \
+-J kmer_freq_mae.k${k}_%a -e logs/viral_mae/kmer_freq_mae.k${k}_%a.err -o logs/viral_mae/kmer_freq_mae.k${k}_%a.out \
+--mail-type=ALL --mail-user=domenico.simone@slu.se<<'EOF'
+#!/bin/bash
+
+python scripts/kmerFreqMAE.py ${k} $(sed -n "$SLURM_ARRAY_TASK_ID"p intermediate/jellyfish/viral/batches/viral_batch_list)
+
+EOF
+```
+
+### what
+
+```python
+import pandas as pd
+import glob, os
+
+def clean(NCBI_AC):
+    a = NCBI_AC
+    try:
+        NCBI_AC = NCBI_AC.split('_')[1:]
+        NCBI_AC[-1] = NCBI_AC[-1].split('.')[0]
+        NCBI_AC = '_'.join(NCBI_AC)
+    except:
+        NCBI_AC = a
+        #print "Cleaning yielded an error. Got %s, AC is %s" % (a, NCBI_AC)
+    return NCBI_AC
+
+def trick(cell):
+    if "GCA" in cell:
+        cell = cell.replace("GCA", "GCF")
+    elif "GCF" in cell:
+        cell = cell.replace("GCF", "GCA")
+    else:
+        cell = cell
+    return cell
+
+def getRelevantRank(taxonomy):
+    relevant_rank = ""
+    #taxonomy = taxonomy.split(";")
+    try:
+        if "Proteobacteria" in taxonomy:
+            taxonomy = taxonomy.split(";")
+            for i in taxonomy:
+                if i.startswith("c__"):
+                    relevant_rank = i[3:]
+        else:
+            taxonomy = taxonomy.split(";")
+            for i in taxonomy:
+                if i.startswith("p__"):
+                    relevant_rank = i[3:]
+    except:
+        print "Taxonomy %s yielded an error" % taxonomy
+    if relevant_rank == "":
+        print "Taxonomy %s returned an empty relevant rank" % taxonomy
+    return relevant_rank
+
+def taxonomic_assignment(kmer_value):
+    kmer_value = int(kmer_value)
+    path = r'intermediate/jellyfish/viral_cc/k%d' % kmer_value
+    allFiles = glob.glob(path + "/*viral_batch*.out")
+    frame = pd.DataFrame()
+    list_ = []
+    for file_ in allFiles:
+        df = pd.read_table(file_, header=None, sep = "\t")
+        list_.append(df)
+    
+    frame = pd.concat(list_)
+    frame.columns = ['viral_contig.kmer', 'top_hits_cc', 'top_hits']
+    
+    # read NCBI taxonomic assignments
+    NCBI_taxonomy = pd.read_table("data/bac_taxonomy_r86.tsv")
+    NCBI_taxonomy.columns = ["AC", "taxonomy"]
+    NCBI_taxonomy['AC'] = NCBI_taxonomy['AC'].apply(clean)
+    
+    # since some AC are shifted from GCA to GCF,
+    # create a fake version of the NCBI_taxonomy table
+    
+    NCBI_taxonomy_fake = NCBI_taxonomy.copy()
+    NCBI_taxonomy_fake['AC'] = NCBI_taxonomy_fake['AC'].apply(lambda x: trick(x))
+    
+    # read MAG taxonomic assignments
+    MAG_taxonomy_files = glob.glob("../gtdb-tk_test/gtdbtk_output_batch.*/*classification_pplacer.tsv")
+    #print MAG_taxonomy_files
+    mframe = pd.DataFrame()
+    mlist_ = []
+    for file_ in MAG_taxonomy_files:
+        mdf = pd.read_table(file_, header=None, sep = "\t")
+        mlist_.append(mdf)
+    
+    mframe = pd.concat(mlist_)
+    mframe.columns = ["AC", "taxonomy"]
+    
+    # rbind taxonomy tables
+    all_taxonomy = NCBI_taxonomy.append(mframe).append(NCBI_taxonomy_fake)
+    
+    # join!
+    frame_taxonomy = pd.merge(frame, all_taxonomy, left_on = "top_hits", right_on = "AC", how = "left")
+    
+    # get phylum or class, in case of Proteobacteria
+    frame_taxonomy['taxonomy_short'] = frame_taxonomy['taxonomy'].apply(lambda x: getRelevantRank(x))
+    frame_taxonomy.to_csv(path_or_buf = "results/viral_contigs_host_assignment_k%d.tsv" % kmer_value, sep = "\t", index = False)
+    #return frame_taxonomy
+
+taxonomic_assignment(4)
+```
+
+### Taxonomic assignment of predicted hosts
+
+For most NCBI genomes used in this analysis taxonomic assignments are already available through GTDB (file `data/bac_taxonomy_r86.tsv`). For the ones with no taxonomic assignment available through GTDB, we'll compute it ourselves with gtdb-tk. We need also to assign taxonomy to the Äspö MAGs.
+
 ### Taxonomic assignment of NCBI genomes and Äspö MAGs
 
-For most NCBI genomes used in this analysis taxonomic assignments already available through GTDB. For the ones with no taxonomic assignment available, we'll compute it ourselves with gtdb-tk. We need also to assign taxonomy to the Äspö MAGs.
+#### Taxonomic assignment of NCBI genomes missing from GTDB
+
+Get list of NCBI genomes with missing taxonomic assignment. 
+
+```python
+# python
+
+import pandas as pd
+import glob, os, sys
+
+unknown_genomes = set()
+
+for outf in glob.glob('results/viral_contigs_host_assignment_k*.tsv'):
+    a = open(outf, 'r')
+    for i in a:
+        i = i.split("\t")
+        if i[3] == "":
+            unknown_genomes.add(i[2])
+
+#try:
+os.makedirs("intermediate/unknown_genomes")
+ppp = open("intermediate/unknown_genomes/unknown_genomes_list", 'w')
+for i in unknown_genomes:
+    ppp.write(i+'\n')
+
+ppp.close()
+os.system("grep -hf intermediate/unknown_genomes/unknown_genomes_list data/assembly_summary.links.* > intermediate/unknown_genomes/unknown_genomes_list.links")
+#except: sys.exit("Couldn't create dir.")
+#len(unknown_genomes)
+```
 
 #### Taxonomic assignment of MAGs from Wu et al.
 
@@ -261,11 +462,167 @@ Many putative host genomes have no taxonomy. We should get their AC, download th
 
 ### Taxonomic assignment with gtdb-tk
 
+Taxonomic assignment with **gtdb-tk**
+
+```bash
+# activate conda env if not active yet
+conda activate /crex/proj/sllstore2017037/nobackup/domenico/gtdb-tk
+
+# generate log folder
+mkdir -p logs/gtdbtk/unknown_genomes_2
+
+# generate genome batches
+ls intermediate/unknown_genomes_2/*.fna.gz > intermediate/unknown_genomes_2/unknown_genomes.ls
+cd intermediate/unknown_genomes_2 && split -l 200 --numeric-suffixes unknown_genomes.ls unknown_genomes.ls.batch && cd -
+
+for i in $(ls intermediate/unknown_genomes_2/unknown_genomes.ls.batch*); do
+    export batchPath=${i}
+    export batchFile=$(basename ${i})
+    export export_dir=`pwd`
+sbatch -A snic2017-7-182 -p node -t 30:00:00 \
+-J gtdbtk_unknown.${batchFile} -o logs/gtdbtk/unknown_genomes_2/gtdbtk_unknown.${batchFile}.out -e logs/gtdbtk/unknown_genomes_2/gtdbtk_unknown.${batchFile}.err \
+--mail-type=ALL --mail-user=domenico.simone@slu.se<<'EOF'
+#!/bin/bash
+
+for j in $(cat ${batchPath}); do
+    cp ${j} ${SNIC_TMP}
+done
+
+cd ${SNIC_TMP}
+
+for i in $(ls *fna.gz); do
+    zcat ${i} > ${i/.fna.gz/.fna}
+done
+
+ls *.fna | awk 'BEGIN{FS=".";OFS="\t"}{print $0, $1}' > unknown_genomes.batchfile
+
+gtdbtk classify_wf --cpus 20 --min_perc_aa 50 --debug --batchfile unknown_genomes.batchfile --out_dir unknown_genomes.${batchFile}_gtdbtk_out -x fna
+
+rsync -av unknown_genomes.${batchFile}_gtdbtk_out ${export_dir}/intermediate/unknown_genomes_2
+
+EOF
+done
+```
+
 ### Calculate Mean Absolute Error (MAE) to get host prediction (bacterial/archaeal vs viral)
 
 ## Taxonomic assignment of putative host genomes not available in gtdb-tk (gtdb-tk)
 
 ### Run batches
+
+
+### Re-merge MAE results
+
+Re-merge MAE analysis with taxonomic assignments, adding the new ones
+
+```python
+import pandas as pd
+import glob, os
+
+def clean(NCBI_AC):
+    a = NCBI_AC
+    try:
+        NCBI_AC = NCBI_AC.split('_')[1:]
+        NCBI_AC[-1] = NCBI_AC[-1].split('.')[0]
+        NCBI_AC = '_'.join(NCBI_AC)
+    except:
+        NCBI_AC = a
+        #print "Cleaning yielded an error. Got %s, AC is %s" % (a, NCBI_AC)
+    return NCBI_AC
+
+def trick(cell):
+    if "GCA" in cell:
+        cell = cell.replace("GCA", "GCF")
+    elif "GCF" in cell:
+        cell = cell.replace("GCF", "GCA")
+    else:
+        cell = cell
+    return cell
+
+def getRelevantRank(taxonomy):
+    relevant_rank = ""
+    #taxonomy = taxonomy.split(";")
+    try:
+        if "Proteobacteria" in taxonomy:
+            taxonomy = taxonomy.split(";")
+            for i in taxonomy:
+                if i.startswith("c__"):
+                    relevant_rank = i[3:]
+        else:
+            taxonomy = taxonomy.split(";")
+            for i in taxonomy:
+                if i.startswith("p__"):
+                    relevant_rank = i[3:]
+    except:
+        print "Taxonomy %s yielded an error" % taxonomy
+    if relevant_rank == "":
+        print "Taxonomy %s returned an empty relevant rank" % taxonomy
+    return relevant_rank
+
+def taxonomic_assignment(kmer_value):
+    kmer_value = int(kmer_value)
+    path = r'intermediate/jellyfish/viral_mae/k%d' % kmer_value
+    allFiles = glob.glob(path + "/*viral_batch*.out")
+    frame = pd.DataFrame()
+    list_ = []
+    for file_ in allFiles:
+        df = pd.read_table(file_, header=None, sep = "\t")
+        list_.append(df)
+    
+    frame = pd.concat(list_)
+    frame.columns = ['viral_contig.kmer', 'MAE', 'host_prediction']
+    
+    # read NCBI taxonomic assignments from gtdb-tk data
+    NCBI_taxonomy = pd.read_table("data/bac_taxonomy_r86.tsv")
+    NCBI_taxonomy.columns = ["AC", "taxonomy"]
+    NCBI_taxonomy['AC'] = NCBI_taxonomy['AC'].apply(clean)
+    
+    # since some AC are shifted from GCA to GCF,
+    # create a fake version of the NCBI_taxonomy table
+    
+    NCBI_taxonomy_fake = NCBI_taxonomy.copy()
+    NCBI_taxonomy_fake['AC'] = NCBI_taxonomy_fake['AC'].apply(lambda x: trick(x))
+    
+    # Some genomes are not present in the gtdb-tk data, we had to do that
+    NCBI_unknown_taxonomy_files = glob.glob("intermediate/unknown_genomes/unknown_genomes.unknown_genomes.ls.batch*_gtdbtk_out/*classification_pplacer.tsv")
+    # Latest batch of taxonomic assignments
+    NCBI_unknown_taxonomy_files = NCBI_unknown_taxonomy_files + glob.glob("intermediate/unknown_genomes_2/unknown_genomes.unknown_genomes.ls.batch*_gtdbtk_out/*classification_pplacer.tsv")
+    NCBI_unknown_dataframe = pd.DataFrame()
+    ulist_ = []
+    for file_ in NCBI_unknown_taxonomy_files:
+        udf = pd.read_table(file_, header=None, sep = "\t")
+        ulist_.append(udf)
+    
+    uframe = pd.concat(ulist_)
+    uframe.columns = ["AC", "taxonomy"]
+    
+    # read MAG taxonomic assignments
+    MAG_taxonomy_files = glob.glob("../gtdb-tk_test/gtdbtk_output_batch.*/*classification_pplacer.tsv")
+    #print MAG_taxonomy_files
+    mframe = pd.DataFrame()
+    mlist_ = []
+    for file_ in MAG_taxonomy_files:
+        mdf = pd.read_table(file_, header=None, sep = "\t")
+        mlist_.append(mdf)
+    
+    mframe = pd.concat(mlist_)
+    mframe.columns = ["AC", "taxonomy"]
+    
+    # rbind taxonomy tables
+    all_taxonomy = NCBI_taxonomy.append(mframe).append(NCBI_taxonomy_fake).append(uframe)
+    
+    # join!
+    frame_taxonomy = pd.merge(frame, all_taxonomy, left_on = "host_prediction", right_on = "AC", how = "left")
+    
+    # get phylum or class, in case of Proteobacteria
+    frame_taxonomy['taxonomy_short'] = frame_taxonomy['taxonomy'].apply(lambda x: getRelevantRank(x))
+    os.system('mkdir -p results/viral_contigs_host_prediction/MAE')
+    frame_taxonomy.to_csv(path_or_buf = "results/viral_contigs_host_prediction/MAE/viral_contigs_host_assignment_k%d.181114.tsv" % kmer_value, sep = "\t", index = False)
+    #return frame_taxonomy
+
+taxonomic_assignment(4)
+
+```
 
 ### Summarise assignments at the relevant_rank level
 
