@@ -6,5 +6,4 @@ The deep terrestrial virosphere. Karin Holmfeldt _et al_, submitted for publicat
 
 ## Brief description of tools used in this study
 
-- [Blast](docs/blast.md)
 - [Host prediction of viral contigs](docs/host-prediction.md)

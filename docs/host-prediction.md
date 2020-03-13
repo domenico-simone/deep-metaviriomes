@@ -24,7 +24,7 @@
 
 ### Viral contigs
 
-The dataset included here is available at NCBI with accession numbers:MT141153-MT145203.
+Viral contigs used in this protocol are available at NCBI with accession numbers:MT141153-MT145203.
 
 ### NCBI genomes
 
@@ -32,7 +32,7 @@ The list of NCBI genomes to be included in the analysis was downloaded on March 
 
 ### Äspö MAGs not in NCBI
 
-Metagenome assembled genomes (hereafter named **MAGs**) binned from ...
+Host prediction for viral contigs tested also metagenome assembled genomes (hereafter named **MAGs**) reconstructed from sequencing data from Äspö aquifers ([PRJNA279923](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA279923), [PRJNA279924](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA279924), and [PRJNA295907](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA295907)). These MAGs are available at https://zenodo.org/record/3700451#.XmtyyPF7mpd.
 
 ## Set up working environment
 
