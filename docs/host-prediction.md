@@ -38,6 +38,8 @@ Host prediction for viral contigs tested also metagenome assembled genomes (here
 
 This analysis has been run on a computing cluster with a SLURM job scheduler. Access to resources managed by SLURM usually requires an active account where computing time is charged. In order to replicate the analyses described in this repo, you need to set the following variable which identifies the account on the cluster.
 
+**Code is meant to be run in bash, unless otherwise noted**.
+
 ```bash
 export SLURMaccount="snic2018-3-187"
 ```
@@ -114,7 +116,7 @@ genomeList=$(sed -n "$SLURM_ARRAY_TASK_ID"p ${outDir}/assembly_summary.all.links
 
 echo ${genomeList}
 
-cp ${genomeList} ${SNIC_TMP} && cd ${SNIC_TMP}
+cp ${genomeList} /tmp && cd /tmp
 
 while read line; do
     echo $line
@@ -302,7 +304,7 @@ mkdir -p logs/viral_mae
 
 export k=4
 
-sbatch -n1 -p core -A snic2018-3-187 -t 2-00:00:00 \
+sbatch -n1 -p core -A ${SLURMaccount} -t 2-00:00:00 \
 --array=1-$(wc -l < intermediate/jellyfish/viral/batches/viral_batch_list) \
 -J kmer_freq_mae.k${k}_%a -e logs/viral_mae/kmer_freq_mae.k${k}_%a.err -o logs/viral_mae/kmer_freq_mae.k${k}_%a.out \
 --mail-type=ALL --mail-user=domenico.simone@slu.se<<'EOF'
@@ -332,7 +334,7 @@ python scripts/get_genome_batch.py
 Run gtdbtk on MAGs
 
 ```bash
-sbatch -A snic2018-8-310 -p node -t 10:00:00 \
+sbatch -A ${SLURMaccount} -p node -t 10:00:00 \
 -J gtdbtk -o gtdbtk.out -e gtdbtk.err \
 --array=1-$(ls input_batches/genomes_batch.* | wc -l)<<'EOF'
 #!/bin/bash
@@ -519,16 +521,16 @@ for i in $(ls intermediate/unknown_genomes_2/unknown_genomes.ls.batch*); do
     export batchPath=${i}
     export batchFile=$(basename ${i})
     export export_dir=`pwd`
-sbatch -A snic2017-7-182 -p node -t 30:00:00 \
+sbatch -A ${SLURMaccount} -p node -t 30:00:00 \
 -J gtdbtk_unknown.${batchFile} -o logs/gtdbtk/unknown_genomes_2/gtdbtk_unknown.${batchFile}.out -e logs/gtdbtk/unknown_genomes_2/gtdbtk_unknown.${batchFile}.err \
 --mail-type=ALL --mail-user=domenico.simone@slu.se<<'EOF'
 #!/bin/bash
 
 for j in $(cat ${batchPath}); do
-    cp ${j} ${SNIC_TMP}
+    cp ${j} /tmp
 done
 
-cd ${SNIC_TMP}
+cd /tmp
 
 for i in $(ls *fna.gz); do
     zcat ${i} > ${i/.fna.gz/.fna}
