@@ -700,3 +700,5 @@ for k in D:
 
 b.close()
 ```
+
+The file `results/viral_contigs_host_prediction/MAE/viral_contigs_host_assignment_k4.final.summary.tsv` is reported in Supplemental Table S2.
