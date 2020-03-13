@@ -32,7 +32,7 @@ The list of NCBI genomes to be included in the analysis was downloaded on March 
 
 ### Äspö MAGs not in NCBI
 
-Host prediction for viral contigs tested also metagenome assembled genomes (hereafter named **MAGs**) reconstructed from sequencing data from Äspö aquifers ([PRJNA279923](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA279923), [PRJNA279924](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA279924), and [PRJNA295907](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA295907)). These MAGs are available at https://zenodo.org/record/3700451#.XmtyyPF7mpd.
+Host prediction for viral contigs tested also metagenome assembled genomes (hereafter named **MAGs**) reconstructed from sequencing data from Äspö aquifers ([PRJNA279923](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA279923), [PRJNA279924](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA279924), and [PRJNA295907](https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJNA295907)). These MAGs are available at [Zenodo]( https://zenodo.org/record/3700451/files/MAGs.tar.gz?download=1).
 
 ## Set up working environment
 
